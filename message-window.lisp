@@ -221,8 +221,10 @@ When the value is :log-order, new messages are added to the bottom as in a log f
   "Retain all messages sent by (message ...), (echo ...) forms within body
  without clearing the screen."
   `(progn
-     ;; clear current messages
-     (setf (screen-current-msg (current-screen)) nil)
+     ;; clear current messages if not retaining
+     (unless *retain-messages-p*
+       (setf (screen-current-msg (current-screen)) nil
+             (screen-current-msg-highlights (current-screen)) nil))
      (let ((*retain-messages-p* ,(if log-order-p :log-order t)))
        ,@body)))
 
@@ -230,13 +232,23 @@ When the value is :log-order, new messages are added to the bottom as in a log f
   "Draw each string in l in the screen's message window. HIGHLIGHT is
   the nth entry to highlight."
   (when strings
-    (when *retain-messages-p*
-      (setf strings
-            (if (eq :log-order *retain-messages-p*)
-                ;; new messages added to the bottom, like a log file
-                (append (screen-current-msg screen) strings)
-                ;; new messages show at the top
-                (append strings (screen-current-msg screen)))))
+    (case *retain-messages-p*
+      ((:log-order) ;; new messages added to the bottom, like a log file
+       (setf
+        ;; update new highlight indices with offset
+        highlights (append
+                    (screen-current-msg-highlights screen)
+                    (loop for idx in highlights
+                          collect (+ idx (length (screen-current-msg screen)))))
+        strings (append (screen-current-msg screen) strings)))
+      ((t) ;; new messages added at the top
+       (setf
+        ;; update old highlight indices with offset
+        highlights (append
+                    highlights
+                    (loop for idx in (screen-current-msg-highlights screen)
+                          collect (+ idx (length strings))))
+        strings (append strings (screen-current-msg screen)))))
     (unless *executing-stumpwm-command*
       (multiple-value-bind (width height)
           (rendered-size strings (screen-message-cc screen))
