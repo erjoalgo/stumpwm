@@ -232,23 +232,20 @@ When the value is :log-order, new messages are added to the bottom as in a log f
   "Draw each string in l in the screen's message window. HIGHLIGHT is
   the nth entry to highlight."
   (when strings
-    (case *retain-messages-p*
-      ((:log-order) ;; new messages added to the bottom, like a log file
-       (setf
-        ;; update new highlight indices with offset
-        highlights (append
-                    (screen-current-msg-highlights screen)
-                    (loop for idx in highlights
-                          collect (+ idx (length (screen-current-msg screen)))))
-        strings (append (screen-current-msg screen) strings)))
-      ((t) ;; new messages added at the top
-       (setf
-        ;; update old highlight indices with offset
-        highlights (append
-                    highlights
-                    (loop for idx in (screen-current-msg-highlights screen)
-                          collect (+ idx (length strings))))
-        strings (append strings (screen-current-msg screen)))))
+    (when *retain-messages-p*
+      (let (top top-high bot bot-high)
+        (if (eq *retain-messages-p* :log-order)
+            ;; new messages added to the bottom, like a log file
+            (setf top (screen-current-msg screen) top-high (screen-current-msg-highlights screen)
+                  bot strings  bot-high highlights)
+            ;; new messages at the top
+            (setf top strings top-high highlights
+                  bot (screen-current-msg screen) bot-high (screen-current-msg-highlights screen)))
+        (setf strings (append top bot)
+              highlights (append top-high
+                                 (loop for idx in bot-high
+                                       with offset = (length top)
+                                       collect (+ idx offset))))))
     (unless *executing-stumpwm-command*
       (multiple-value-bind (width height)
           (rendered-size strings (screen-message-cc screen))
