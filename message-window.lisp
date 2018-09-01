@@ -27,7 +27,8 @@
 (export '(echo-string
           err
           message
-          gravity-coords))
+          gravity-coords
+          with-retained-messages))
 
 (defun max-width (font l)
   "Return the width of the longest string in L using FONT."
@@ -212,10 +213,30 @@ function expects to be wrapped in a with-state for win."
   (let ((*record-last-msg-override* t))
     (apply 'echo-string-list screen (nth n (screen-last-msg screen)) (nth n (screen-last-msg-highlights screen)))))
 
+(defvar *retain-messages-p* nil
+  "When non-nil, retain old messages in addition to new ones.
+When the value is :log-order, new messages are added to the bottom as in a log file.")
+
+(defmacro with-retained-messages (log-order-p &body body)
+  "Retain all messages sent by (message ...), (echo ...) forms within body
+ without clearing the screen."
+  `(progn
+     ;; clear current messages
+     (setf (screen-current-msg (current-screen)) nil)
+     (let ((*retain-messages-p* ,(if log-order-p :log-order t)))
+       ,@body)))
+
 (defun echo-string-list (screen strings &rest highlights)
   "Draw each string in l in the screen's message window. HIGHLIGHT is
   the nth entry to highlight."
   (when strings
+    (when *retain-messages-p*
+      (setf strings
+            (if (eq :log-order *retain-messages-p*)
+                ;; new messages added to the bottom, like a log file
+                (append (screen-current-msg screen) strings)
+                ;; new messages show at the top
+                (append strings (screen-current-msg screen)))))
     (unless *executing-stumpwm-command*
       (multiple-value-bind (width height)
           (rendered-size strings (screen-message-cc screen))
