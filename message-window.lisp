@@ -213,11 +213,12 @@ function expects to be wrapped in a with-state for win."
   (let ((*record-last-msg-override* t))
     (apply 'echo-string-list screen (nth n (screen-last-msg screen)) (nth n (screen-last-msg-highlights screen)))))
 
-(defvar *retain-messages-p* nil
-  "When non-nil, retain old messages in addition to new ones.
-When the value is :log-order, new messages are added to the bottom as in a log file.")
+(defvar *queue-messages-p* nil)
 
 (defmacro with-message-queuing (new-on-bottom-p &body body)
+  "Queue all messages sent by (MESSAGE ...), (ECHO-STRING ...), (ECHO-STRING-LIST ...)
+ forms within BODY without clobbering earlier messages.
+When NEW-ON-BOTTOM-P is non-nil, new messages are queued at the bottom."
   `(progn
      ;; clear current messages if not already queueing
      (unless *queue-messages-p*
