@@ -228,24 +228,35 @@ When the value is :log-order, new messages are added to the bottom as in a log f
      (let ((*retain-messages-p* ,(if log-order-p :log-order t)))
        ,@body)))
 
+(defun combine-new-old-messages (new new-highlights
+                                 old old-highlights &key new-on-bottom-p)
+  "combine NEW and OLD messages and their highlights according to NEW-ON-TOP-P"
+  (let (top top-highlights bot bot-highlights)
+    (if new-on-bottom-p
+        ;; new messages added to the bottom, like a log file
+        (setf top old top-highlights old-highlights
+              bot new bot-highlights new-highlights)
+        ;; new messages at the top
+        (setf bot old bot-highlights old-highlights
+              top new top-highlights new-highlights))
+    (values (append top bot)
+            (append top-highlights
+                    (loop for idx in bot-highlights
+                       with offset = (length top)
+                       collect (+ idx offset))))))
+
 (defun echo-string-list (screen strings &rest highlights)
   "Draw each string in l in the screen's message window. HIGHLIGHT is
   the nth entry to highlight."
   (when strings
     (when *retain-messages-p*
-      (let (top top-high bot bot-high)
-        (if (eq *retain-messages-p* :log-order)
-            ;; new messages added to the bottom, like a log file
-            (setf top (screen-current-msg screen) top-high (screen-current-msg-highlights screen)
-                  bot strings  bot-high highlights)
-            ;; new messages at the top
-            (setf top strings top-high highlights
-                  bot (screen-current-msg screen) bot-high (screen-current-msg-highlights screen)))
-        (setf strings (append top bot)
-              highlights (append top-high
-                                 (loop for idx in bot-high
-                                       with offset = (length top)
-                                       collect (+ idx offset))))))
+      (multiple-value-bind (combined-strings combined-highlights)
+          (combine-new-old-messages
+           strings highlights
+           (screen-current-msg screen) (screen-current-msg-highlights screen)
+           :new-on-bottom-p (eq *retain-messages-p* :log-order))
+        (setf strings combined-strings
+              highlights combined-highlights)))
     (unless *executing-stumpwm-command*
       (multiple-value-bind (width height)
           (rendered-size strings (screen-message-cc screen))
