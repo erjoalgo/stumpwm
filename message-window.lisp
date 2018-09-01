@@ -28,7 +28,7 @@
           err
           message
           gravity-coords
-          with-retained-messages))
+          with-message-queuing))
 
 (defun max-width (font l)
   "Return the width of the longest string in L using FONT."
@@ -217,15 +217,13 @@ function expects to be wrapped in a with-state for win."
   "When non-nil, retain old messages in addition to new ones.
 When the value is :log-order, new messages are added to the bottom as in a log file.")
 
-(defmacro with-retained-messages (log-order-p &body body)
-  "Retain all messages sent by (message ...), (echo ...) forms within body
- without clearing the screen."
+(defmacro with-message-queuing (new-on-bottom-p &body body)
   `(progn
-     ;; clear current messages if not retaining
-     (unless *retain-messages-p*
+     ;; clear current messages if not already queueing
+     (unless *queue-messages-p*
        (setf (screen-current-msg (current-screen)) nil
              (screen-current-msg-highlights (current-screen)) nil))
-     (let ((*retain-messages-p* ,(if log-order-p :log-order t)))
+     (let ((*queue-messages-p* ,(if new-on-bottom-p :new-on-bottom t)))
        ,@body)))
 
 (defun combine-new-old-messages (new new-highlights
@@ -249,12 +247,12 @@ When the value is :log-order, new messages are added to the bottom as in a log f
   "Draw each string in l in the screen's message window. HIGHLIGHT is
   the nth entry to highlight."
   (when strings
-    (when *retain-messages-p*
+    (when *queue-messages-p*
       (multiple-value-bind (combined-strings combined-highlights)
           (combine-new-old-messages
            strings highlights
            (screen-current-msg screen) (screen-current-msg-highlights screen)
-           :new-on-bottom-p (eq *retain-messages-p* :log-order))
+           :new-on-bottom-p (eq *queue-messages-p* :new-on-bottom))
         (setf strings combined-strings
               highlights combined-highlights)))
     (unless *executing-stumpwm-command*
