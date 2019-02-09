@@ -254,8 +254,9 @@ When NEW-ON-BOTTOM-P is non-nil, new messages are queued at the bottom."
     (values (append top bot)
             (append top-highlights
                     (loop for idx in bot-highlights
-                       with offset = (length top)
-                       collect (+ idx offset))))))
+                          with offset = (length top)
+                          when idx
+                            collect (+ idx offset))))))
 
 (defun echo-string-list (screen strings &rest highlights)
   "Draw each string in l in the screen's message window. HIGHLIGHT is
